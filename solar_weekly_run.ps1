@@ -349,6 +349,41 @@ $reportLines | ForEach-Object { Write-Log $_ }
 Write-Log '============================================================'
 Set-Content -Path $ReportPath -Value $report -Encoding UTF8
 
+# ------------------------------------------------------------
+# Stage 5: Optional Telegram notification
+# ------------------------------------------------------------
+Write-Log ''
+Write-Log '-- Stage 5: Telegram notification --'
+
+try {
+    $TelegramScript = Join-Path $ProjectRoot 'scripts\telegram_bot.py'
+    if (-not (Test-Path $TelegramScript)) {
+        Write-Log 'Telegram script not found, skipping notification' 'WARN'
+    } else {
+        $telegramOutput = & python -X utf8 $TelegramScript send-report --report-file $ReportPath 2>&1
+        $telegramExit = $LASTEXITCODE
+        $telegramOutput | ForEach-Object { Write-Log $_ }
+
+        if ($telegramExit -eq 0) {
+            Write-Log 'OK Telegram notification finished'
+        } else {
+            Write-Log "WARN Telegram notification exit code $telegramExit" 'WARN'
+        }
+
+        $tokenAlertOutput = & python -X utf8 $TelegramScript check-token-alert 2>&1
+        $tokenAlertExit = $LASTEXITCODE
+        $tokenAlertOutput | ForEach-Object { Write-Log $_ }
+
+        if ($tokenAlertExit -eq 0) {
+            Write-Log 'OK Telegram token alert check finished'
+        } else {
+            Write-Log "WARN Telegram token alert check exit code $tokenAlertExit" 'WARN'
+        }
+    }
+} catch {
+    Write-Log "WARN Telegram notification failed: $($_.Exception.Message)" 'WARN'
+}
+
 Write-Host ''
 Write-Host "Full log:    $LogFile"
 Write-Host "Last report: $ReportPath"
