@@ -22,7 +22,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 
-APP_CACHE_RELATIVE = Path("iot7.cn") / "七云物联" / "shared_preferences.json"
+APP_CACHE_RELATIVE = Path("iot7.cn") / "\u4e03\u4e91\u7269\u8054" / "shared_preferences.json"
 ACCESS_CACHE_KEY = "flutter.token"
 REFRESH_CACHE_KEY = "flutter.token2"
 ENV_ACCESS_KEY = "Z3A_TOKEN"
