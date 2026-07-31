@@ -618,6 +618,10 @@ def _run_step5_combine(new_csv: Path, dry_run: bool = False):
     log.info("  去重後：%d 筆（移除 %d 筆）", len(combined), before - len(combined))
 
     combined["_ts_sort"] = pd.to_datetime(combined["timestamp"], format="mixed", errors="coerce")
+    invalid_ts = combined["_ts_sort"].isna()
+    if invalid_ts.any():
+        log.warning("Dropping %d row(s) with invalid timestamp before writing combined CSV", int(invalid_ts.sum()))
+        combined = combined.loc[~invalid_ts].copy()
     combined = combined.sort_values(["_ts_sort", "panel_id"]).drop(columns=["_ts_sort"])
 
     if CSV_PATH.exists():
@@ -780,6 +784,10 @@ def main():
     log.info("去重後：%d 筆 (移除 %d 筆重複)", len(combined), before - len(combined))
 
     combined["_ts_sort"] = pd.to_datetime(combined["timestamp"], format="mixed", errors="coerce")
+    invalid_ts = combined["_ts_sort"].isna()
+    if invalid_ts.any():
+        log.warning("Dropping %d row(s) with invalid timestamp before writing combined CSV", int(invalid_ts.sum()))
+        combined = combined.loc[~invalid_ts].copy()
     combined = combined.sort_values(["_ts_sort", "panel_id"]).drop(columns=["_ts_sort"])
 
     if CSV_PATH.exists():
