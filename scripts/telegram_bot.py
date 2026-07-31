@@ -18,8 +18,9 @@ import secrets
 import subprocess
 import sys
 import time
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
@@ -51,6 +52,12 @@ JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
 TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_RE = re.compile(r"^\d{2}:\d{2}:\d{2}$")
+CSV_TIMESTAMP_FORMATS = (
+    "%Y-%m-%d %H:%M:%S",
+    "%Y/%m/%d %H:%M",
+    "%Y/%m/%d %H:%M:%S",
+)
+EXPECTED_10_MIN_SLOTS_PER_DAY = 144
 
 
 @dataclass(frozen=True)
@@ -461,6 +468,16 @@ def latest_complete_timestamp(header: list[str], tail_lines: list[str]) -> tuple
     return "unknown", saw_incomplete_timestamp
 
 
+def parse_csv_timestamp(value: str) -> datetime | None:
+    value = value.strip()
+    for fmt in CSV_TIMESTAMP_FORMATS:
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
 def build_csv_status(env_file: Path) -> str:
     env = load_env_file(env_file)
     raw_path = env.get("Z3A_CSV_PATH", "")
@@ -516,6 +533,176 @@ def csv_latest_date(env_file: Path) -> tuple[date | None, str]:
         return None, f"Unable to parse latest CSV timestamp from {csv_path}: {exc}"
 
     return latest_dt.date(), f"Latest CSV timestamp: {latest_dt:%Y-%m-%d %H:%M:%S}"
+
+
+def date_ranges(days: list[date]) -> list[str]:
+    if not days:
+        return []
+    ranges: list[str] = []
+    start = prev = days[0]
+    for current in days[1:]:
+        if current == prev + timedelta(days=1):
+            prev = current
+            continue
+        ranges.append(f"{start:%Y-%m-%d}" if start == prev else f"{start:%Y-%m-%d} -> {prev:%Y-%m-%d}")
+        start = prev = current
+    ranges.append(f"{start:%Y-%m-%d}" if start == prev else f"{start:%Y-%m-%d} -> {prev:%Y-%m-%d}")
+    return ranges
+
+
+def parse_days_arg(raw: str | None, *, default: int = 30, maximum: int = 180) -> int:
+    if raw is None or not raw.strip():
+        return default
+    try:
+        days = int(raw.strip())
+    except ValueError as exc:
+        raise ValueError(f"days must be an integer, got: {raw}") from exc
+    if days < 1 or days > maximum:
+        raise ValueError(f"days must be between 1 and {maximum}, got: {days}")
+    return days
+
+
+def build_csv_gap_status(
+    env_file: Path,
+    *,
+    days: int = 30,
+    end_day: date | None = None,
+) -> str:
+    env = load_env_file(env_file)
+    raw_path = env.get("Z3A_CSV_PATH", "")
+    if not raw_path:
+        return f"CSV gap check\n\nZ3A_CSV_PATH is not set in {env_file}"
+
+    csv_path = normalize_path(raw_path)
+    if not csv_path.exists():
+        return f"CSV gap check\n\nMissing CSV: {csv_path}"
+
+    end_day = end_day or date.today()
+    start_day = end_day - timedelta(days=days - 1)
+    window_days = [start_day + timedelta(days=i) for i in range(days)]
+
+    panels_by_timestamp: dict[datetime, set[str]] = defaultdict(set)
+    rows_by_day: Counter[date] = Counter()
+    malformed_rows = 0
+    trailing_malformed_sample = ""
+    latest_valid: datetime | None = None
+
+    try:
+        with csv_path.open("r", encoding="utf-8-sig", errors="replace", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                raw_timestamp = row.get("timestamp", "")
+                timestamp = parse_csv_timestamp(raw_timestamp)
+                if not timestamp:
+                    malformed_rows += 1
+                    if raw_timestamp:
+                        trailing_malformed_sample = raw_timestamp.strip()
+                    continue
+
+                if latest_valid is None or timestamp > latest_valid:
+                    latest_valid = timestamp
+
+                current_day = timestamp.date()
+                if current_day < start_day or current_day > end_day:
+                    continue
+
+                panel_id = (row.get("panel_id") or "").strip()
+                panels_by_timestamp[timestamp].add(panel_id or "<missing-panel-id>")
+                rows_by_day[current_day] += 1
+    except Exception as exc:
+        return f"CSV gap check\n\nParse failed: {exc}\nPath: {csv_path}"
+
+    timestamps_by_day: dict[date, list[datetime]] = defaultdict(list)
+    for timestamp in panels_by_timestamp:
+        timestamps_by_day[timestamp.date()].append(timestamp)
+
+    panel_counts = [len(panels) for panels in panels_by_timestamp.values()]
+    expected_panels = max(panel_counts) if panel_counts else 0
+
+    missing_days: list[date] = []
+    severe_partial_days: list[tuple[date, int, int, str]] = []
+    partial_days: list[tuple[date, int, int, str]] = []
+    panel_gap_days: list[tuple[date, int, int]] = []
+
+    for current_day in window_days:
+        timestamps = sorted(timestamps_by_day.get(current_day, []))
+        slot_count = len(timestamps)
+        if slot_count == 0:
+            missing_days.append(current_day)
+            continue
+
+        first_time = timestamps[0].strftime("%H:%M")
+        last_time = timestamps[-1].strftime("%H:%M")
+        time_range = f"{first_time}-{last_time}"
+        row_count = rows_by_day[current_day]
+        if slot_count < EXPECTED_10_MIN_SLOTS_PER_DAY // 2:
+            severe_partial_days.append((current_day, slot_count, row_count, time_range))
+        elif slot_count < EXPECTED_10_MIN_SLOTS_PER_DAY:
+            partial_days.append((current_day, slot_count, row_count, time_range))
+
+        if expected_panels:
+            low_panel_slots = sum(
+                1
+                for timestamp in timestamps
+                if len(panels_by_timestamp[timestamp]) < expected_panels
+            )
+            if low_panel_slots:
+                panel_gap_days.append((current_day, low_panel_slots, slot_count))
+
+    problem_lines: list[str] = []
+    for day_range in date_ranges(missing_days):
+        problem_lines.append(f"- {day_range}: no rows")
+
+    for current_day, slot_count, row_count, time_range in severe_partial_days:
+        problem_lines.append(
+            f"- {current_day:%Y-%m-%d}: severe partial, {slot_count}/144 slots, "
+            f"{row_count} rows, {time_range}"
+        )
+
+    for current_day, slot_count, row_count, time_range in partial_days:
+        problem_lines.append(
+            f"- {current_day:%Y-%m-%d}: partial, {slot_count}/144 slots, "
+            f"{row_count} rows, {time_range}"
+        )
+
+    panel_gap_lines_added = 0
+    for current_day, low_panel_slots, slot_count in panel_gap_days:
+        if len(problem_lines) >= 24:
+            break
+        problem_lines.append(
+            f"- {current_day:%Y-%m-%d}: panel gaps in {low_panel_slots}/{slot_count} slots "
+            f"(expected {expected_panels} panels)"
+        )
+        panel_gap_lines_added += 1
+
+    omitted_panel_gap_days = len(panel_gap_days) - panel_gap_lines_added
+    if omitted_panel_gap_days > 0:
+        problem_lines.append(f"- ... {omitted_panel_gap_days} more panel-gap day(s) omitted")
+
+    latest_text = latest_valid.strftime("%Y-%m-%d %H:%M:%S") if latest_valid else "unknown"
+    malformed_note = ""
+    if malformed_rows:
+        malformed_note = f"\nMalformed timestamp rows: {malformed_rows}"
+        if trailing_malformed_sample:
+            malformed_note += f" (latest sample: {trailing_malformed_sample})"
+
+    status = "OK" if not (missing_days or severe_partial_days or partial_days or panel_gap_days) else "WARN"
+    issues = "\n".join(problem_lines) if problem_lines else "- none"
+    return (
+        "CSV gap check\n\n"
+        f"Status: {status}\n"
+        f"Window: {start_day:%Y-%m-%d} -> {end_day:%Y-%m-%d} ({days} days)\n"
+        f"Latest valid timestamp: {latest_text}\n"
+        f"Expected cadence: 10 min, 144 slots/day\n"
+        f"Expected panels/slot: {expected_panels or 'unknown'} (auto-detected)\n"
+        f"Missing full days: {len(missing_days)}\n"
+        f"Severe partial days: {len(severe_partial_days)}\n"
+        f"Partial days: {len(partial_days)}\n"
+        f"Panel-gap days: {len(panel_gap_days)}"
+        f"{malformed_note}\n\n"
+        "Issues:\n"
+        f"{issues}"
+    )
 
 
 def latest_weekly_log(log_dir: Path = DEFAULT_LOG_DIR) -> Path | None:
@@ -776,6 +963,8 @@ def help_text() -> str:
         "/allstatus - send status fanout to configured topics\n"
         "/token - Z3A token status, redacted\n"
         "/csv - CSV path and latest timestamp\n"
+        "/gap30 - check missing CSV data in the last 30 days\n"
+        "/gap <days> - check missing CSV data for a custom window\n"
         "/docker - Docker and backend health\n"
         "/ops - operations help\n"
         "/reload, /collect, /update_token, /restart_backend, /run_weekly - operations, confirm required\n"
@@ -817,6 +1006,7 @@ def build_all_status_messages(
     return [
         ("weekly", weekly_message),
         ("csv", build_csv_status(config.env_file)),
+        ("csv", build_csv_gap_status(config.env_file, days=30)),
         ("token", run_token_check()),
         ("docker", build_docker_status()),
     ]
@@ -947,13 +1137,21 @@ def reply_to_command(config: BotConfig, message: dict, args: argparse.Namespace)
             if result != 0:
                 exit_code = result
         if exit_code == 0:
-            reply = "All status messages sent: weekly, csv, token."
+            reply = "All status messages sent: weekly, csv, gap30, token, docker."
         else:
             reply = f"All status fanout finished with error code {exit_code}. Check bot log."
     elif cmd == "/token":
         reply = run_token_check()
     elif cmd == "/csv":
         reply = build_csv_status(config.env_file)
+    elif cmd in {"/gap", "/gap30"}:
+        try:
+            days = 30 if cmd == "/gap30" else parse_days_arg(
+                command_args(text)[0] if command_args(text) else None
+            )
+            reply = build_csv_gap_status(config.env_file, days=days)
+        except ValueError as exc:
+            reply = f"Invalid gap check argument: {exc}"
     elif cmd == "/docker":
         reply = build_docker_status()
     elif cmd == "/log":
@@ -1041,6 +1239,22 @@ def cmd_test(args: argparse.Namespace) -> int:
 def cmd_send_csv_status(args: argparse.Namespace) -> int:
     config = load_config(args.env_file)
     message = build_csv_status(config.env_file)
+    if args.dry_run:
+        print(message)
+        return 0
+    return send_topic_message(config, message, topic=args.topic, allow_skip=False)
+
+
+def cmd_gap_status(args: argparse.Namespace) -> int:
+    days = parse_days_arg(str(args.days))
+    print(build_csv_gap_status(args.env_file, days=days))
+    return 0
+
+
+def cmd_send_gap_status(args: argparse.Namespace) -> int:
+    config = load_config(args.env_file)
+    days = parse_days_arg(str(args.days))
+    message = build_csv_gap_status(config.env_file, days=days)
     if args.dry_run:
         print(message)
         return 0
@@ -1151,6 +1365,16 @@ def build_parser() -> argparse.ArgumentParser:
     csv_status.add_argument("--dry-run", action="store_true")
     csv_status.set_defaults(func=cmd_send_csv_status)
 
+    gap_status = sub.add_parser("gap-status", help="Print missing CSV data check")
+    gap_status.add_argument("--days", type=int, default=30)
+    gap_status.set_defaults(func=cmd_gap_status)
+
+    send_gap_status = sub.add_parser("send-gap-status", help="Send missing CSV data check to Telegram")
+    send_gap_status.add_argument("--topic", choices=TOPIC_CHOICES, default="csv")
+    send_gap_status.add_argument("--days", type=int, default=30)
+    send_gap_status.add_argument("--dry-run", action="store_true")
+    send_gap_status.set_defaults(func=cmd_send_gap_status)
+
     token_status = sub.add_parser("send-token-status", help="Send Z3A token status to Telegram")
     token_status.add_argument("--topic", choices=TOPIC_CHOICES, default="token")
     token_status.add_argument("--dry-run", action="store_true")
@@ -1163,7 +1387,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     all_status = sub.add_parser(
         "send-all-status",
-        help="Send weekly summary, CSV, token, and Docker status to their configured topics",
+        help="Send weekly summary, CSV, gap, token, and Docker status to their configured topics",
     )
     all_status.add_argument("--report-file", type=Path, default=DEFAULT_REPORT_FILE)
     all_status.add_argument("--include-full-report", action="store_true")
