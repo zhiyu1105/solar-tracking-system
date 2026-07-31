@@ -44,7 +44,7 @@ powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive -WindowStyle H
 
 `SolarTelegramBot` 負責：
 
-- 接收 `/status`、`/token`、`/csv`、`/docker`、`/weekly`、`/allstatus` 等查詢指令。
+- 接收 `/status`、`/token`、`/csv`、`/gap30`、`/gap <天數>`、`/docker`、`/weekly`、`/allstatus` 等查詢指令。
 - 只在 `05-手動操作審核` topic 接受操作型指令。
 - 操作型指令包含 `/collect`、`/update_token`、`/reload`、`/restart_backend`、`/run_weekly`。
 - 每個操作都必須先用 `/confirm <code>` 二階段確認。

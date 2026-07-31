@@ -97,13 +97,17 @@ Telegram polling started. Press Ctrl+C to stop.
 | `/help` | 顯示指令說明 |
 | `/status` | 回覆最新 compact dashboard status |
 | `/weekly` | 回覆最新週報 |
-| `/allstatus` | 分流推送週報、CSV、Token、Docker 狀態到各 topic |
+| `/allstatus` | 分流推送週報、CSV、30 天缺漏檢查、Token、Docker 狀態到各 topic |
 | `/token` | 檢查 Z3A token 狀態，輸出已遮罩 |
 | `/csv` | 檢查 CSV 路徑、大小與最新 timestamp |
+| `/gap30` | 檢查主 CSV 最近 30 天是否有整天缺漏、嚴重缺時段、panel 數偏低或不完整尾列 |
+| `/gap <天數>` | 自訂檢查最近 N 天缺漏，最多 180 天，例如 `/gap 60` |
 | `/docker` | 檢查 Docker container 與 backend API |
 | `/log` | 回覆最新 weekly log 尾端，已遮罩敏感字串 |
 | `/whoami` | 顯示 Telegram user id 與 chat id |
 | `/ops` | 顯示操作型指令與安全規則 |
+
+`/gap30` 是 read-only 檢查，不會修改 CSV。它會以 10 分鐘一筆作為預期節奏，也就是每天 144 個 timestamp；同時自動偵測每個 timestamp 應有的 panel 數。若像 2026/07/02 網路中斷，只剩少數 timestamp，會被列為 severe partial；如果某些日期完全沒有資料，會合併成缺漏日期區間。
 
 ## 4. 操作型指令
 
@@ -157,6 +161,8 @@ cd C:\projects\solar-tracking-dashboard
 C:\01_CODE\python311\python.exe -X utf8 scripts\telegram_bot.py status
 C:\01_CODE\python311\python.exe -X utf8 scripts\telegram_bot.py send-report --dry-run
 C:\01_CODE\python311\python.exe -X utf8 scripts\telegram_bot.py send-all-status --dry-run
+C:\01_CODE\python311\python.exe -X utf8 scripts\telegram_bot.py gap-status --days 30
+C:\01_CODE\python311\python.exe -X utf8 scripts\telegram_bot.py send-gap-status --days 30 --dry-run
 C:\01_CODE\python311\python.exe -X utf8 scripts\telegram_bot.py send-token-status --dry-run
 C:\01_CODE\python311\python.exe -X utf8 scripts\telegram_bot.py check-token-alert --dry-run
 ```

@@ -35,7 +35,7 @@ The task settings must include `ExecutionTimeLimit = PT0S`; otherwise Windows Ta
 
 ### Responsibilities
 
-- Receive Telegram commands such as `/status`, `/token`, `/csv`, `/docker`, `/weekly`, `/allstatus`.
+- Receive Telegram commands such as `/status`, `/token`, `/csv`, `/gap30`, `/gap <days>`, `/docker`, `/weekly`, `/allstatus`.
 - Accept guarded operations only in `05-手動操作審核`, such as `/collect`, `/update_token`, `/reload`, `/restart_backend`, `/run_weekly`.
 - Require `/confirm <code>` before operation commands run.
 - Write runtime logs to:
