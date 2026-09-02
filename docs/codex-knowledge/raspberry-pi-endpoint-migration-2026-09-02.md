@@ -23,6 +23,7 @@
 9. 四台 Pi 的 controller 已改指向新站；每台均先建立同目錄時間戳備份。
 10. system 2、6、7 已 restart 並在新站成功寫入首筆資料；system 4 原本 inactive，移轉後刻意保持 inactive。
 11. 舊站 2026-09-02 最後增量共 540 筆，已下載、驗證並回填新站。
+12. 切換完成後 MySQL dump：`C:\solar-data\backups\post-pi-cutover-20260902_191718\solar_tracking_db.sql`，大小 132,687,955 bytes，SHA-256：`53CD8196A297E581067F22C018EFA298835E54DD92901A9F6F99F71012BF5EAC`。
 
 ## 系統與 Pi 對應
 
