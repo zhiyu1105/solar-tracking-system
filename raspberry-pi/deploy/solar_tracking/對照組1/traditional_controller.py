@@ -44,7 +44,7 @@ except ImportError:
 CONFIG = {
     # Django API
     'system_id': 3,
-    'api_url': 'https://solar-dashboard.tail7c1eb9.ts.net/api',
+    'api_url': 'https://solar-dashboard-zhiyu.tail7c1eb9.ts.net/api',
 
     # 模擬模式（True = 允許在無硬體環境下以隨機值測試；False = 生產模式，硬體失敗直接拋例外）
     'simulation_mode': False,

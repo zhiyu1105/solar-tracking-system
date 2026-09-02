@@ -94,7 +94,7 @@ solar-tracking-dashboard/
 # 於專案根目錄（Windows 主機）
 docker-compose -f docker-compose-dev.yml up -d
 # 儀表板：http://localhost:8000/dashboard/
-# 公網：https://solar-dashboard.tail7c1eb9.ts.net/dashboard/
+# 公網：https://solar-dashboard-zhiyu.tail7c1eb9.ts.net/dashboard/
 ```
 
 注意：開啟 Fiddler 的 HTTPS 解密會破壞 Tailscale 容器 TLS，啟動前請先關閉；改動 `.env.dev` 後需 `up -d --force-recreate backend` 才會重讀。

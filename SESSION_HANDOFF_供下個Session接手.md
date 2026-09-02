@@ -180,8 +180,8 @@
 
 ### 2.3 Dashboard
 
-- URL:`https://solar-dashboard.tail7c1eb9.ts.net/dashboard/`
-- 預期持續看到 system_id=2 和 system_id=4 每 10 分鐘新時間戳
+- URL:`https://solar-dashboard-zhiyu.tail7c1eb9.ts.net/dashboard/`
+- 2026-09-02 起 system_id=2、6、7 持續寫入新節點；system_id=4 保持原本 inactive 狀態
 
 ---
 

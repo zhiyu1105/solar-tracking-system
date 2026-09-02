@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location 'D:\宇靖\solar-tracking-dashboard'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$ApiUrl       = 'https://solar-dashboard.tail7c1eb9.ts.net/api'   # Tailscale Funnel public
+$ApiUrl       = 'https://solar-dashboard-zhiyu.tail7c1eb9.ts.net/api'   # Tailscale Funnel public
 $ApiUrlLocal  = 'http://192.168.0.124:8000/api'                    # 同網內備用
 
 # 用絕對路徑，因為 [System.IO.File]::WriteAllText 使用 .NET process 的 CWD

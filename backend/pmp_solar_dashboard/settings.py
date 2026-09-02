@@ -18,10 +18,13 @@ ALLOWED_HOSTS = _allowed_hosts_env.split() if _allowed_hosts_env else [
     YOUR_PUBLIC_IP,
     YOUR_LOCAL_IP,
 ]
-# 永遠允許 Tailscale Funnel hostname（無論 env 怎麼設都生效）
-_ts_host = 'solar-dashboard.tail7c1eb9.ts.net'
-if _ts_host not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(_ts_host)
+# 永遠允許目前與移轉中的 Tailscale Funnel hostname（無論 env 怎麼設都生效）
+for _ts_host in (
+    'solar-dashboard-zhiyu.tail7c1eb9.ts.net',
+    'solar-dashboard.tail7c1eb9.ts.net',
+):
+    if _ts_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_ts_host)
 
 # HTTPS 來源白名單（CSRF 保護用），從環境變數讀取
 _csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
@@ -122,6 +125,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://140.114.59.214:8000",
     "http://192.168.0.100:3000",
     "http://192.168.0.100:8000",
+    "https://solar-dashboard-zhiyu.tail7c1eb9.ts.net",
     "https://solar-dashboard.tail7c1eb9.ts.net",
 ]
 

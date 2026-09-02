@@ -92,7 +92,7 @@ docker-compose -f docker-compose-dev.yml up -d --build
 | `solar_backend` | custom (`./backend/Dockerfile`) | Django 5.0, port 8000 |
 | `solar_tailscale` | tailscale/tailscale:latest | HTTPS tunnel |
 
-**Access**: local `http://localhost:8000/dashboard/` | public `https://solar-dashboard.tail7c1eb9.ts.net/dashboard/`
+**Access**: local `http://localhost:8000/dashboard/` | public `https://solar-dashboard-zhiyu.tail7c1eb9.ts.net/dashboard/`
 
 **Logs & debug:**
 ```bash
@@ -310,8 +310,8 @@ python raspberry-pi/src/main_controller.py --mode both
 | `TS_AUTHKEY` | Tailscale Auth Key (Reusable, No Expiry, tag:container) |
 | `SQL_ROOT_PASSWORD` | MySQL root password |
 | `SQL_USER` / `SQL_PASSWORD` | MySQL app credentials |
-| `DJANGO_ALLOWED_HOSTS` | Includes `solar-dashboard.tail7c1eb9.ts.net` |
-| `CSRF_TRUSTED_ORIGINS` | Includes `https://solar-dashboard.tail7c1eb9.ts.net` |
+| `DJANGO_ALLOWED_HOSTS` | Includes `solar-dashboard-zhiyu.tail7c1eb9.ts.net` |
+| `CSRF_TRUSTED_ORIGINS` | Includes `https://solar-dashboard-zhiyu.tail7c1eb9.ts.net` |
 
 ## 13. Design Decisions
 

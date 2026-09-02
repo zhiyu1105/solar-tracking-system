@@ -14,7 +14,7 @@
 
 - Local dashboard：`http://localhost:8000/dashboard/`
 - 平行運轉 Tailscale/Funnel dashboard：`https://solar-dashboard-zhiyu.tail7c1eb9.ts.net/dashboard/`
-- 舊節點：`https://solar-dashboard.tail7c1eb9.ts.net/`，推定是學長電腦，平行運轉期間不要動。
+- 舊節點：`https://solar-dashboard.tail7c1eb9.ts.net/`，保留作為移轉前歷史來源；四台 Pi 已於 2026-09-02 改傳新節點。
 
 Docker compose 服務：
 

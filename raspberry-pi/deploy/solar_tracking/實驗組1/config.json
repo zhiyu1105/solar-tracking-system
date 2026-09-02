@@ -2,7 +2,7 @@
     "system_id":  1,
     "device_id":  "raspberry_pi_exp_1",
     "type":  "anfis",
-    "api_url":  "https://solar-dashboard.tail7c1eb9.ts.net/api",
+    "api_url":  "https://solar-dashboard-zhiyu.tail7c1eb9.ts.net/api",
     "api_url_lan":  "http://192.168.0.124:8000/api",
     "title":  "實驗組 I｜ANFIS 智慧追日",
     "location":  {
